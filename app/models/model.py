@@ -15,6 +15,7 @@ class User(db.Model):
     created_at =db.Column(db.DateTime,default = datetime.utcnow)
     otp_hash = db.Column(db.String(128))
     otp_expiration = db.Column(db.DateTime)
+    verified = db.Column(db.Boolean, default=False)
 
     def serialize(self):
         return {

@@ -2,7 +2,7 @@ from flask import  request, jsonify
 from .extensions import  jwt, admin_bp, user_bp, auth_bp, bcrypt
 from .models.model import User, TokenBlocklist, db
 from flask_jwt_extended import  create_access_token, create_refresh_token, jwt_required, get_jwt, current_user, get_jwt_identity
-from app.controllers.user_controller import create_user, get_users, delete_user, update_user, get_user, get_user_orders, forgot_password, verify_otp, update_password
+from app.controllers.user_controller import create_user, get_users, delete_user, update_user, get_user, get_user_orders, forgot_password, verify_otp, update_password, verify_otp_signup
 from app.controllers.product_controller import create_product, get_products, delete_product, update_product, get_product
 from app.controllers.category_controller import create_category, get_categories, delete_category
 from app.controllers.order_controller import create_order, get_orders, delete_order
@@ -14,6 +14,11 @@ from datetime import timedelta
 def register():
     return create_user()
 
+# verify user
+@auth_bp.route('validate_signup_otp', methods=['POST']) 
+def verify_signup_otp():
+    return verify_otp_signup()
+
 # login route
 @auth_bp.route('/login', methods=['POST'])
 def login():
@@ -21,6 +26,8 @@ def login():
     user = User.query.filter_by(email=data['email']).first()
     password = data['password']
     if user and bcrypt.check_password_hash(user.password, password):
+        if not user.verified:
+            return jsonify({'message': 'Please verify your email before logging in'}), 401
         access_token = create_access_token(identity=user.id,expires_delta=timedelta(days=5))
         refresh_token = create_refresh_token(identity=user.id, expires_delta=timedelta(days=6))
         return jsonify(
@@ -31,6 +38,7 @@ def login():
             }
                     ), 201
     return jsonify({'message': 'Invalid email or password'}), 401
+
 
 @jwt.additional_claims_loader
 def make_additional_claims(identity):
@@ -209,5 +217,7 @@ def verify_otp_():
 @jwt_required()
 def update_password_():
     return update_password()
+
+    
 
 
