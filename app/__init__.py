@@ -29,5 +29,7 @@ def create_app():
 
     return app
 
+app = create_app()    
+
 JWT_SECRET_KEY = '8yrsxifxhsgvcjj8t58jj'
 FLASK_JWT_SECRET_KEY ='35d7ddbd85a857199b244479'
