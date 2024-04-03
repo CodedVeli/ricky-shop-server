@@ -93,8 +93,9 @@ def verify_otp_signup():
         user.otp_expiration = None
         user.verified = True
         db.session.commit()
-        send_signup_email(sender_email, sender_password, recipient_email, subject, body)        return jsonify({'message': 'OTP verified successfully'}), 200
-    return jsonify({'message': 'User not found'}), 404
+        send_signup_email(sender_email, sender_password, recipient_email, subject, body)
+    return jsonify({'message': 'OTP verified successfully'}), 200
+
 
 def get_users():
     users = User.query.all()
