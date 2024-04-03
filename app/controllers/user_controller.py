@@ -49,7 +49,9 @@ def create_user():
     user.address = ''.join(data['address'])
     db.session.add(user)
     db.session.commit()
-    send_signup_email(sender_email, sender_password, recipient_email, subject, body)
+    response = send_signup_email(sender_email, sender_password, recipient_email, subject, body)
+    if response:
+        return response
     return jsonify({'message': 'User created successfully'}), 201
 
 def get_users():

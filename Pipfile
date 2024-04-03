@@ -18,6 +18,7 @@ validate-email-address = "*"
 py3dns = "*"
 email-validator = "*"
 kickbox = "*"
+gunicorn = "*"
 
 [dev-packages]
 
