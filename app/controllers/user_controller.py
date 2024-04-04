@@ -182,7 +182,7 @@ def verify_otp():
                 'refresh_token': refresh_token
             }
                     ), 201
-    return jsonify({'message': 'User not found'}), 404
+    
 
 def update_password():
     data = request.get_json()
