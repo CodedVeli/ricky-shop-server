@@ -119,7 +119,7 @@ def get_all_user():
     return jsonify({'message': 'You are not authorized this access'}), 401
 
 @user_bp.route('/delete/<int:user_id>', methods=['DELETE'])
-@jwt_required()
+# @jwt_required()
 def delete_user_(user_id):
     return delete_user(user_id)
 
