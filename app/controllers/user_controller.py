@@ -73,7 +73,6 @@ def create_user():
     return jsonify({'message': 'An OTP code has been sent to your email'}), 200
 
 
-  
 def verify_otp_signup():
     data = request.get_json()
     email = data.get('email')
@@ -89,12 +88,21 @@ def verify_otp_signup():
         if datetime.utcnow() > user.otp_expiration:
             return jsonify({'message': 'OTP has expired'}), 400
         recipient_email = email
+        send_signup_email(sender_email, sender_password, recipient_email, subject, body)
         user.otp_hash = None
         user.otp_expiration = None
         user.verified = True
         db.session.commit()
-        send_signup_email(sender_email, sender_password, recipient_email, subject, body)
-    return jsonify({'message': 'OTP verified successfully'}), 200
+        access_token = create_access_token(identity=user.id,expires_delta=timedelta(days=5))
+        refresh_token = create_refresh_token(identity=user.id, expires_delta=timedelta(days=6))
+        return jsonify(
+            {   
+                'message': 'OTP verified successfully',
+                'access_token': access_token,
+                'refresh_token': refresh_token
+            }
+        ), 201
+    return jsonify({'message': 'User not found'}), 404
 
 
 def get_users():
