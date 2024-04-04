@@ -67,7 +67,7 @@ def create_user():
     db.session.add(user)
     otp = random.randint(100000, 999999)
     user.otp_hash = generate_password_hash(str(otp))
-    user.otp_expiration = datetime.utcnow() + timedelta(hours=2)  # OTP expires after 10 minutes
+    user.otp_expiration = datetime.utcnow() + timedelta(hours=2)  
     db.session.commit()
     send_otp_email_signup(email, otp)
     return jsonify({'message': 'An OTP code has been sent to your email'}), 200
@@ -112,10 +112,12 @@ def get_users():
 def delete_user(user_id):
     user = User.query.get(user_id)
     if user:
+        user.orders = []  # Disassociate the user from their orders
         db.session.delete(user)
         db.session.commit()
         return jsonify({'message': 'User deleted successfully'}), 200
     return jsonify({'message': 'User not found'}), 404
+
 
 def send_otp_email(user_email, otp):
     msg = MIMEMultipart()

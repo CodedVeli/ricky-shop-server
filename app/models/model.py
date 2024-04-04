@@ -11,7 +11,7 @@ class User(db.Model):
     address = db.Column(db.String(100), nullable=False) 
     city = db.Column(db.String(50), nullable=False)
     phone = db.Column(db.String(50), nullable=False)    
-    orders = db.relationship('Order', backref='user', lazy=True)
+    orders = db.relationship('Order', backref='user', lazy=True, cascade="all, delete-orphan")
     created_at =db.Column(db.DateTime,default = datetime.utcnow)
     otp_hash = db.Column(db.String(128))
     otp_expiration = db.Column(db.DateTime)
@@ -80,7 +80,7 @@ class Image(db.Model):
 class Order(db.Model):
     __tablename__ = 'order'
     id = db.Column(db.Integer, primary_key = True, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     total = db.Column(db.Float, nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(50), default='pending')
