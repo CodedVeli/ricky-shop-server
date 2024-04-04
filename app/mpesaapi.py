@@ -1,31 +1,33 @@
 import requests
 from .extensions import mpesa_bp
 from requests.auth import HTTPBasicAuth
-from flask import  request
+from flask import  request, jsonify
 from datetime import datetime
 import json
 import base64
 
 
-consumer_key = "fFhbLAxOBMus8upS0uNUUrRpT6qya9SUrXOwdrjYzeXe4CS0"
-consumer_secret = "UQlZ0Vysmk0A1vHoP524QGkQL1N7PUygYTlsSyDPQGOjK2hP3H22mj0fBTszGFdk"
+consumer_key_ = "fFhbLAxOBMus8upS0uNUUrRpT6qya9SUrXOwdrjYzeXe4CS0"
+consumer_secret_ = "UQlZ0Vysmk0A1vHoP524QGkQL1N7PUygYTlsSyDPQGOjK2hP3H22mj0fBTszGFdk"
 base_url = "http:102.217.157.198/5000"
+mpesa_passkey = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919"
 
 api_url = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
 
 @mpesa_bp.route('/access_token', methods=['GET'])
-def access_token():
+def get_mpesa_access_token():
+    consumer_key = consumer_key_
+    consumer_secret = consumer_secret_
     api_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
 
     r = requests.get(api_url, auth=HTTPBasicAuth(consumer_key, consumer_secret))
     mpesa_access_token = json.loads(r.text)
     validated_mpesa_access_token = mpesa_access_token['access_token']
-    return validated_mpesa_access_token   
-
+    return validated_mpesa_access_token
 
 @mpesa_bp.route('/register_url', methods=['POST'])
 def register_url():
-    token = access_token()
+    token = get_mpesa_access_token()
     api_url = "https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl"
     headers = {"Authorization": "Bearer %s" % token}
     request = {
@@ -103,24 +105,24 @@ def initiate_stk_push():
     data = request.get_json()
     phone_number = data['phone_number']
     amount = data['amount']
-    ac_token = "KGuDFImjWA6pB6XdBPSQVDW44HKu"
+    ac_token = get_mpesa_access_token()
     api_url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
 
     headers = {
-        'Authorization': 'Bearer %s' % ac_token,
+        'Authorization': 'Bearer %s' % f'{ac_token}',
         'Content-Type': 'application/json'
     }
 
     request_payload = {
     "BusinessShortCode": 174379,
-    "Password": "MTc0Mzc5YmZiMjc5ZjlhYTliZGJjZjE1OGU5N2RkNzFhNDY3Y2QyZTBjODkzMDU5YjEwZjc4ZTZiNzJhZGExZWQyYzkxOTIwMjQwNDAzMDEwOTMx",
+    "Password": generate_mpesa_password(),
     "Timestamp": "20240403010931",
     "TransactionType": "CustomerPayBillOnline",
-    "Amount": amount,
+    "Amount": str(amount),
     "PartyA": '254' + str(phone_number),
     "PartyB": 174379,
     "PhoneNumber": '254' + str(phone_number),
-    "CallBackURL": "https://mydomain.com/path",
+    "CallBackURL": "https://sandbox.safaricom.co.ke/mpesa/",
     "AccountReference": "Ricky's Shop",
     "TransactionDesc": "Payment of items" 
   }
