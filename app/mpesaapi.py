@@ -1,131 +1,118 @@
 import requests
-from .extensions import mpesa_bp
-from requests.auth import HTTPBasicAuth
-from flask import  request, jsonify
-from datetime import datetime
-import json
+import os
 import base64
+from datetime import datetime
+from requests.auth import HTTPBasicAuth
+from flask import request, jsonify
+from .extensions import mpesa_bp
 
 
-consumer_key_ = "fFhbLAxOBMus8upS0uNUUrRpT6qya9SUrXOwdrjYzeXe4CS0"
-consumer_secret_ = "UQlZ0Vysmk0A1vHoP524QGkQL1N7PUygYTlsSyDPQGOjK2hP3H22mj0fBTszGFdk"
-base_url = "http:102.217.157.198/5000"
-mpesa_passkey = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919"
+class MpesaClient:
+    def __init__(self):
+        self.consumer_key = os.getenv('MPESA_CONSUMER_KEY')
+        self.consumer_secret = os.getenv('MPESA_CONSUMER_SECRET')
+        self.shortcode = os.getenv('MPESA_SHORTCODE')
+        self.passkey = os.getenv('MPESA_PASSKEY')
+        self.party_a = os.getenv('MPESA_PARTY_A')
 
-api_url = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
+    def get_access_token(self):
+        api_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
+        try:
+            response = requests.get(api_url, auth=HTTPBasicAuth(
+                self.consumer_key, self.consumer_secret))
+            response.raise_for_status()
+            return response.json()['access_token']
+        except requests.exceptions.RequestException as e:
+            print(f"Error getting access token: {e}")
+            return None
 
-@mpesa_bp.route('/access_token', methods=['GET'])
-def get_mpesa_access_token():
-    consumer_key = consumer_key_
-    consumer_secret = consumer_secret_
-    api_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
+    def generate_password(self):
+        lipa_time = datetime.now().strftime('%Y%m%d%H%M%S')
+        data_to_encode = self.shortcode + self.passkey + lipa_time
+        return base64.b64encode(data_to_encode.encode()).decode('utf-8')
 
-    r = requests.get(api_url, auth=HTTPBasicAuth(consumer_key, consumer_secret))
-    mpesa_access_token = json.loads(r.text)
-    validated_mpesa_access_token = mpesa_access_token['access_token']
-    return validated_mpesa_access_token
+    def validate_phone_number(self, phone_number: str) -> str:
+        # so that one can input 07593911XX or +2547593911XX
+        # and it will be converted to 2547593911XX
+        # This ensures that the phone number is in the format 254XXXXXXXXX
+        # But the 254 becomes a problem if you have users from different countries
+        # like +256
+        if phone_number is None:
+            return None
 
-@mpesa_bp.route('/register_url', methods=['POST'])
-def register_url():
-    token = get_mpesa_access_token()
-    api_url = "https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl"
-    headers = {"Authorization": "Bearer %s" % token}
-    request = {
-        "ShortCode": "600383",
-        "ResponseType": "Completed",
-        "ConfirmationURL": base_url + "",
-        "ValidationURL": ""
-    }
-    response = requests.post(api_url, json=request, headers=headers)    
+        if phone_number.startswith("+"):
+            phone_number = phone_number[1:]
+        if phone_number.startswith("0"):
+            phone_number = "254" + phone_number[1:]
+        return phone_number
 
-    return response.json()
+    def validate_amount(self, amount: float) -> float:
+        return max(amount, 0)
 
-# confirm
-# @mpesa_bp.route('/c2b/confirm' , methods=['POST'])
-# def confirm():
-#     data = request.get_json()
-#     # write to file
-#     file = open('confirm.json', 'a') 
-#     file.write(json.dumps(data))
-#     file.close()
-#     return {
-#         "ResultCode": 0,
-#         "ResultDesc": "Accepted"
-#     }
+    def initiate_stk_push(self, phone_number, amount):
+        phone_number = self.validate_phone_number(phone_number)
+        amount = self.validate_amount(amount)
 
-# # validate
-# @mpesa_bp.route('/c2b/validate' , methods=['POST'])
-# def validate():
-#     data = request.get_json()
-#     # write to file
-#     file = open('validate.json', 'a') 
-#     file.write(json.dumps(data))
-#     file.close()
-#     return {
-#         "ResultCode": 0,
-#         "ThirdPartyTransID": "1234567890",
-#         "ResultDesc": "Accepted"
-#     }
+        api_url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+        access_token = self.get_access_token()
 
-# # simulate
-# @mpesa_bp.route('/simulate', methods=['POST'])
-# def simulate():         
+        if not access_token:
+            return "Failed to get access token."
 
-    # token = access_token()
-    # api_url = "https://sandbox.safaricom.co.ke/mpesa/c2b/v1/simulate"
-    # headers = {"Authorization": "Bearer %s" % token}
-    # request = {
-    #     "ShortCode": "600383",
-    #     "CommandID": "CustomerPayBillOnline",
-    #     "Amount": "100",
-    #     "Msisdn": "254700272040",
-    #     "BillRefNumber": "TestAPI"
-    # }
-    # response = requests.post(api_url, json=request, headers=headers)
-    # return response.json()
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
+
+        request_payload = {
+            "BusinessShortCode": self.shortcode,
+            "Password": self.generate_password(),
+            "Timestamp": datetime.now().strftime('%Y%m%d%H%M%S'),
+            "TransactionType": "CustomerPayBillOnline",
+            "Amount": amount,
+            "PartyA": self.party_a,
+            "PartyB": self.shortcode,
+            "PhoneNumber": phone_number,
+            "CallBackURL": "https://sandbox.safaricom.co.ke/mpesa/",  # change the live URL
+            "AccountReference": "12345678",
+            "TransactionDesc": "Pay For goods in rick shop"
+        }
+
+        response = requests.post(
+            api_url, json=request_payload, headers=headers)
+
+        if response.status_code == 200:
+            print(response.json())
+            return True
+        else:
+            print(response.json())
+            raise Exception(response.json())
 
 
-# generate mpesa password
-
-MPESA_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919"
-MPESA_SHORTCODE = "174379"
-# phone_number = "254700272040"
-# amount = 1
-def generate_mpesa_password():
-    lipa_time = datetime.now().strftime('%Y%m%d%H%M%S')
-    business_short_code = MPESA_SHORTCODE
-    passkey = MPESA_PASSKEY
-    data_to_encode = business_short_code + passkey + lipa_time
-    online_password = base64.b64encode(data_to_encode.encode())
-    decoded_password = online_password.decode('utf-8')
-    return decoded_password
-
-@mpesa_bp.route('/lipa_na_mpesa', methods=["POST"])
+@mpesa_bp.route('/lipa_na_mpesa', methods=['POST'])
 def initiate_stk_push():
     data = request.get_json()
-    phone_number = data['phone_number']
-    amount = data['amount']
-    ac_token = get_mpesa_access_token()
-    api_url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+    print(f"Data: {data}")
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
 
-    headers = {
-        'Authorization': 'Bearer %s' % f'{ac_token}',
-        'Content-Type': 'application/json'
-    }
+    phone_number = data.get('phone_number')
+    amount = data.get('amount')
 
-    request_payload = {
-    "BusinessShortCode": 174379,
-    "Password": generate_mpesa_password(),
-    "Timestamp": "20240403010931",
-    "TransactionType": "CustomerPayBillOnline",
-    "Amount": str(amount),
-    "PartyA": '254' + str(phone_number),
-    "PartyB": 174379,
-    "PhoneNumber": '254' + str(phone_number),
-    "CallBackURL": "https://sandbox.safaricom.co.ke/mpesa/",
-    "AccountReference": "Ricky's Shop",
-    "TransactionDesc": "Payment of items" 
-  }
+    if not phone_number or not amount:
+        return jsonify({"error": "Phone number or amount missing"}), 400
 
-    response = requests.request("POST", api_url, headers=headers, json=request_payload)
-    return response.text.encode('utf8')
+    mpesa_client = MpesaClient()
+
+    phone_number = mpesa_client.validate_phone_number(phone_number)
+    amount = mpesa_client.validate_amount(amount)
+
+    if phone_number is None or amount is None:
+        return jsonify({"error": "Invalid phone number or amount"}), 400
+
+    try:
+        mpesa_client.initiate_stk_push(phone_number, amount)
+        return jsonify({"message": "STK push initiated"}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
