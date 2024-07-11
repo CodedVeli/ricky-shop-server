@@ -87,6 +87,7 @@ class Order(db.Model):
     delivery_method = db.Column(db.String(50), default='pickup')  
     payment_method = db.Column(db.String(50), default='cash')
     shipping_cost = db.Column(db.Float, default=0)
+    payment = db.relationship('OrderPayments', backref='order', lazy=True)  
     created_at =db.Column(db.DateTime,default = datetime.utcnow)
     products = db.relationship('Product', secondary=order_product)
 
@@ -134,3 +135,10 @@ class TokenBlocklist(db.Model):
             'jti': self.jti,
             'created_at': self.created_at
         }    
+class OrderPayments(db.Model):
+    __tablename__ = 'order_payments'
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    phone_number = db.Column(db.String(50), nullable=False)
+    mpesa_receipt_number = db.Column(db.String(50), nullable=False)

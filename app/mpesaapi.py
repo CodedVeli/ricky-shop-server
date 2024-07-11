@@ -5,6 +5,7 @@ from datetime import datetime
 from requests.auth import HTTPBasicAuth
 from flask import request, jsonify
 from .extensions import mpesa_bp
+# from models.model import OrderPayments
 
 
 class MpesaClient:
@@ -73,7 +74,7 @@ class MpesaClient:
             "PartyA": self.party_a,
             "PartyB": self.shortcode,
             "PhoneNumber": phone_number,
-            "CallBackURL": "https://sandbox.safaricom.co.ke/mpesa/",  # change the live URL
+            "CallBackURL": "http://127.0.0.1:5000/mpesa/callback",  # change the live URL
             "AccountReference": "12345678",
             "TransactionDesc": "Pay For goods in rick shop"
         }
@@ -116,3 +117,33 @@ def initiate_stk_push():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+@mpesa_bp.route('/callback', methods=['POST'])
+def handle_callback():
+    callback_data = request.json
+
+    # Check the result code
+    result_code = callback_data['Body']['stkCallback']['ResultCode']
+    if result_code != 0:
+        # If the result code is not 0, there was an error
+        error_message = callback_data['Body']['stkCallback']['ResultDesc']
+        response_data = {'ResultCode': result_code, 'ResultDesc': error_message}
+        return jsonify(response_data)
+
+    # If the result code is 0, the transaction was completed
+    callback_metadata = callback_data['Body']['stkCallback']['CallbackMetadata']
+    amount = None
+    phone_number = None
+    for item in callback_metadata['Item']:
+        if item['Name'] == 'Amount':
+            amount = item['Value']
+        elif item['Name'] == 'PhoneNumber':
+            phone_number = item['Value']
+
+    # Save the variables to a file or database, etc.
+    # ...
+
+    # Return a success response to the M-Pesa server
+    response_data = {'ResultCode': result_code, 'ResultDesc': 'Success'}
+    print(response_data)
+    return jsonify(response_data)
