@@ -128,6 +128,7 @@ def handle_callback():
         # If the result code is not 0, there was an error
         error_message = callback_data['Body']['stkCallback']['ResultDesc']
         response_data = {'ResultCode': result_code, 'ResultDesc': error_message}
+        print('error',response_data)
         return jsonify(response_data)
 
     # If the result code is 0, the transaction was completed
