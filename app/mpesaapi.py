@@ -74,7 +74,7 @@ class MpesaClient:
             "PartyA": self.party_a,
             "PartyB": self.shortcode,
             "PhoneNumber": phone_number,
-            "CallBackURL": "http://127.0.0.1:5000/mpesa/callback",  # change the live URL
+            "CallBackURL": "https://ricky-shop-server-3.onrender.com/mpesa/callback",  # change the live URL
             "AccountReference": "12345678",
             "TransactionDesc": "Pay For goods in rick shop"
         }
