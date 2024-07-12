@@ -1,12 +1,14 @@
 import requests
 import os
+from queue import Queue
 import base64
 from datetime import datetime
 from requests.auth import HTTPBasicAuth
-from flask import request, jsonify
+from flask import request, jsonify, json, Response
 from .extensions import mpesa_bp
 # from models.model import OrderPayments
 
+clients = []
 
 class MpesaClient:
     def __init__(self):
@@ -121,17 +123,17 @@ def initiate_stk_push():
 @mpesa_bp.route('/callback', methods=['POST'])
 def handle_callback():
     callback_data = request.json
-
-    # Check the result code
     result_code = callback_data['Body']['stkCallback']['ResultCode']
+    
     if result_code != 0:
-        # If the result code is not 0, there was an error
         error_message = callback_data['Body']['stkCallback']['ResultDesc']
         response_data = {'ResultCode': result_code, 'ResultDesc': error_message}
-        print('error',response_data)
+        print('error', response_data)
+        # Notify clients about the error
+        for client in clients:
+            client.put(json.dumps(response_data))
         return jsonify(response_data)
 
-    # If the result code is 0, the transaction was completed
     callback_metadata = callback_data['Body']['stkCallback']['CallbackMetadata']
     amount = None
     phone_number = None
@@ -141,10 +143,23 @@ def handle_callback():
         elif item['Name'] == 'PhoneNumber':
             phone_number = item['Value']
 
-    # Save the variables to a file or database, etc.
-    # ...
-
-    # Return a success response to the M-Pesa server
-    response_data = {'ResultCode': result_code, 'ResultDesc': 'Success'}
+    response_data = {'ResultCode': result_code, 'ResultDesc': 'Success', 'Amount': amount, 'PhoneNumber': phone_number}
     print(response_data)
+    # Notify clients about the success
+    for client in clients:
+        client.put(json.dumps(response_data))
     return jsonify(response_data)
+
+@mpesa_bp.route('/subscribe')
+def subscribe():
+    def stream():
+        q = Queue()
+        clients.append(q)
+        try:
+            while True:
+                result = q.get()
+                yield f'data: {result}\n\n'
+        except GeneratorExit:
+            clients.remove(q)
+
+    return Response(stream(), content_type='text/event-stream')
